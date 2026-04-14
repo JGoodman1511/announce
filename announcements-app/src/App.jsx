@@ -14,7 +14,6 @@ export default function App() {
   const [selectedAnn, setSelectedAnn] = useState(null);
   const [editingAnn, setEditingAnn] = useState(null);
 
-  // New: Track which categories are minimized
   const [minimizedCategories, setMinimizedCategories] = useState(new Set());
 
   const contentRef = useRef(null);
@@ -47,16 +46,7 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
-    if (announcements.length > 0 && !selectedAnn) {
-      setSelectedAnn(announcements[0]);
-    }
-  }, [announcements]);
-
-  useEffect(() => {
-    axios.get(`${API}/events`).then(res => setEvents(res.data));
-  }, []);
-
+  // Load data
   const loadAnnouncements = (eventId) => {
     axios.get(`${API}/announcements/${eventId}`).then(res => setAnnouncements(res.data));
   };
@@ -66,10 +56,14 @@ export default function App() {
   };
 
   useEffect(() => {
+    axios.get(`${API}/events`).then(res => setEvents(res.data));
+  }, []);
+
+  useEffect(() => {
     if (currentEvent?.id) {
       loadAnnouncements(currentEvent.id);
       loadCategories(currentEvent.id);
-      setMinimizedCategories(new Set()); // Reset minimized state when switching events
+      setMinimizedCategories(new Set());
     }
   }, [currentEvent?.id]);
 
@@ -96,16 +90,12 @@ export default function App() {
   const toggleMinimize = (categoryId) => {
     setMinimizedCategories(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(categoryId)) {
-        newSet.delete(categoryId);
-      } else {
-        newSet.add(categoryId);
-      }
+      if (newSet.has(categoryId)) newSet.delete(categoryId);
+      else newSet.add(categoryId);
       return newSet;
     });
   };
 
-  // Reorder helpers
   const moveCategoryUp = (index) => {
     if (index <= 0) return;
     const newCategories = [...categories];
@@ -124,47 +114,305 @@ export default function App() {
       .then(() => setCategories(newCategories));
   };
 
-  // EVENT SELECT (unchanged)
-  if (mode === 'select') {
-    return (
-      <div className="event-select">
-        <h1 className="event-title">Select Event</h1>
-        <div className="event-list">
-          {events.map(e => (
-            <div key={e.id} className="event-item">
-              <button className="event-button" onClick={() => { setCurrentEvent(e); setMode('announce'); }}>
-                {e.title}
-              </button>
-              <button className="delete-button" onClick={async () => {
-                if (!window.confirm(`Delete "${e.title}"?`)) return;
-                await axios.delete(`${API}/events/${e.id}`);
-                setEvents(prev => prev.filter(ev => ev.id !== e.id));
-              }}>✕</button>
-            </div>
-          ))}
-          <button className="event-button new" onClick={async () => {
-            const title = prompt('Event Name');
-            const location = prompt('Event Location');
-            const fieldName = prompt('Field Name (optional)');
-            await axios.post(`${API}/events`, { title, location, fieldName });
-            window.location.reload();
-          }}>+ New Event</button>
-        </div>
-      </div>
-    );
-  }
-
+  // ====================== NAV ====================== 
   const Nav = () => (
     <div className='navbar'>
       <button onClick={() => setMode('select')}>Event Select</button>
-      <button onClick={() => setMode('announce')}>Announce</button>
+      <button className='announceButton'onClick={() => setMode('announce')}>Announce</button>
       <button onClick={() => setMode('edit')}>Edit Cards</button>
       <button onClick={() => setMode('categories')}>Edit Categories</button>
       <button onClick={() => setMode('gameRef')}>Game Reference</button>
     </div>
   );
 
-  // EDIT CATEGORIES (unchanged)
+  // ====================== EDIT MODE (with Photo Upload) ======================
+  if (mode === 'edit') {
+    return (
+      <div>
+        <Nav />
+        <h2>Edit Announcements</h2>
+
+        {editingAnn && (
+          <div className='main'>
+            <div className="card" ref={contentRef} style={{ height: '100%', overflow: 'hidden' }}>
+              <h3>{editingAnn.id ? 'Edit Announcement' : 'New Announcement'}</h3>
+
+              <input placeholder="Title" value={editingAnn.title || ''} onChange={e => setEditingAnn({ ...editingAnn, title: e.target.value })} style={{ width: '100%', marginBottom: 10 }} />
+
+              <input placeholder="Subtitle" value={editingAnn.subtitle || ''} onChange={e => setEditingAnn({ ...editingAnn, subtitle: e.target.value })} style={{ width: '100%', marginBottom: 10 }} />
+
+              <textarea placeholder="Markdown Content" value={editingAnn.content || ''} onChange={e => setEditingAnn({ ...editingAnn, content: e.target.value })} style={{ width: '100%', height: 150, marginBottom: 10 }} />
+
+              <select value={editingAnn.categoryId || ''} onChange={e => setEditingAnn({ ...editingAnn, categoryId: e.target.value || null })} style={{ width: '100%', marginBottom: 10 }}>
+                <option value="">No Category</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+
+              {/* === PHOTO UPLOAD SECTION === */}
+              <div style={{ margin: '20px 0' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>Announcement Photo (optional)</label>
+                
+                {editingAnn.image && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <img 
+                      src={`${API}/${editingAnn.image}`} 
+                      alt="Preview" 
+                      style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '8px' }} 
+                    />
+                    <button 
+                      onClick={async () => {
+                        await axios.delete(`${API}/announcement/image/${editingAnn.id}`);
+                        setEditingAnn({ ...editingAnn, image: null });
+                      }}
+                      className="delete-button"
+                      style={{ marginTop: '8px' }}
+                    >
+                      Remove Photo
+                    </button>
+                  </div>
+                )}
+
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    if (!editingAnn.id) {
+                      alert("Please save the announcement first before uploading a photo.");
+                      return;
+                    }
+                    const formData = new FormData();
+                    formData.append('image', file);
+                    try {
+                      const res = await axios.post(`${API}/upload/announcement/${editingAnn.id}`, formData);
+                      setEditingAnn({ ...editingAnn, image: res.data.path });
+                    } catch (err) {
+                      alert("Failed to upload image");
+                    }
+                  }} 
+                />
+              </div>
+
+              <button onClick={async () => {
+                if (editingAnn.id) {
+                  await axios.put(`${API}/announcements/${editingAnn.id}`, editingAnn);
+                } else {
+                  await axios.post(`${API}/announcements`, { ...editingAnn, eventId: currentEvent.id });
+                }
+                setEditingAnn(null);
+                loadAnnouncements(currentEvent.id);
+              }}>Save</button>
+
+              <button className="secondary" onClick={() => setEditingAnn(null)} style={{ marginLeft: 10 }}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {!editingAnn && (
+          <div style={{ padding: '20px' }}>
+            <button onClick={() => setEditingAnn({ id: null, title: '', subtitle: '', content: '', categoryId: null, image: null })}>
+              New Announcement
+            </button>
+            {announcements.map(a => (
+              <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '12px 0', padding: '10px', background: '#2a2a2a', borderRadius: '8px' }}>
+                <strong style={{ flex: 1 }}>{a.title}</strong>
+                {a.image && <span style={{ color: '#22c55e' }}>📸</span>}
+                {a.categoryId && <span style={{ fontSize: '13px', color: '#888' }}>📂 {categories.find(c => c.id === a.categoryId)?.name}</span>}
+                {a.highlight && <span style={{ background: '#22c55e', color: '#000', padding: '2px 8px', borderRadius: '9999px', fontSize: '12px' }}>ANNOUNCED</span>}
+                <button onClick={() => setEditingAnn(a)}>Edit</button>
+                <button onClick={async () => { await axios.delete(`${API}/announcements/${a.id}`); loadAnnouncements(currentEvent.id); }}>Delete</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+    // ====================== ANNOUNCE MODE ======================
+  if (mode === 'announce') {
+    const groupedAnns = {};
+    categories.forEach(cat => groupedAnns[cat.id] = { name: cat.name, anns: [] });
+    const uncategorized = [];
+
+    announcements.forEach(a => {
+      if (a.categoryId && groupedAnns[a.categoryId]) {
+        groupedAnns[a.categoryId].anns.push(a);
+      } else {
+        uncategorized.push(a);
+      }
+    });
+
+    return (
+      <div>
+        <Nav />
+
+        <div className="container">
+          <div className="sidebar">
+            {currentEvent && (
+              <div className="home-card">
+                <h2>{currentEvent.title}</h2>
+                {currentEvent.location && <p>📍 {currentEvent.location}</p>}
+                {currentEvent.fieldName && <p>🏟 {currentEvent.fieldName}</p>}
+              </div>
+            )}
+
+            {categories.map(cat => {
+              const isMinimized = minimizedCategories.has(cat.id);
+              const catAnns = groupedAnns[cat.id]?.anns || [];
+              return (
+                <React.Fragment key={cat.id}>
+                  <div 
+                    className="category-label" 
+                    onClick={() => toggleMinimize(cat.id)} 
+                    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                  >
+                    <span>{cat.name}</span>
+                    <span style={{ fontSize: '18px', opacity: 0.8 }}>{isMinimized ? '▲' : '▼'}</span>
+                  </div>
+                  {!isMinimized && catAnns.map(a => (
+                    <button 
+                      key={a.id} 
+                      className={`ann-button 
+                        ${a.highlight ? 'highlighted' : ''} 
+                        ${selectedAnn?.id === a.id ? 'active' : ''}`}
+                      onClick={() => setSelectedAnn(a)}
+                    >
+                      {a.title}
+                    </button>
+                  ))}
+                </React.Fragment>
+              );
+            })}
+
+            {uncategorized.length > 0 && (
+              <>
+                <div 
+                  className="category-label" 
+                  onClick={() => toggleMinimize('uncat')} 
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                >
+                  <span>Uncategorized</span>
+                  <span style={{ fontSize: '18px', opacity: 0.8 }}>{minimizedCategories.has('uncat') ? '▲' : '▼'}</span>
+                </div>
+                {!minimizedCategories.has('uncat') && uncategorized.map(a => (
+                  <button 
+                    key={a.id} 
+                    className={`ann-button 
+                      ${a.highlight ? 'highlighted' : ''} 
+                      ${selectedAnn?.id === a.id ? 'active' : ''}`}
+                    onClick={() => setSelectedAnn(a)}
+                  >
+                    {a.title}
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+
+          <div className="main">
+            <div className="card" ref={contentRef}>
+              <div className="announce-content">
+                {!selectedAnn && <p>Select an announcement from the sidebar</p>}
+
+                {selectedAnn && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                      <h1 className="title">{selectedAnn.title}</h1>
+                      <button 
+                        onClick={() => toggleHighlight(selectedAnn)} 
+                        style={{
+                          padding: '8px 16px',
+                          background: selectedAnn.highlight ? '#ef4444' : '#22c55e',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontWeight: '600'
+                        }}
+                      >
+                        {selectedAnn.highlight ? 'Announced' : 'Announce'}
+                      </button>
+                    </div>
+
+                    <h2 className="subtitle">{selectedAnn.subtitle}</h2>
+
+                    {selectedAnn.image && (
+                      <div style={{ 
+                        flex: '1 1 auto',
+                        margin: '20px 0 35px 0',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        minHeight: '0'
+                      }}>
+                        <img 
+                          src={`${API}/${selectedAnn.image}`} 
+                          alt="Announcement visual" 
+                          style={{ 
+                            maxWidth: '100%',
+                            maxHeight: '68vh',
+                            objectFit: 'contain',
+                            borderRadius: '12px',
+                            boxShadow: '0 10px 30px rgba(0,0,0,0.8)'
+                          }} 
+                        />
+                      </div>
+                    )}
+
+                    <div className="content">
+                      <ReactMarkdown>{selectedAnn.content}</ReactMarkdown>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ====================== GAME REFERENCE ======================
+  if (mode === 'gameRef') {
+    const handleRemove = async () => {
+      if (!currentEvent?.gameRef) return;
+      if (!window.confirm('Remove the current game reference image?')) return;
+      try {
+        await axios.delete(`${API}/gameRef/${currentEvent.id}`);
+        setCurrentEvent({ ...currentEvent, gameRef: null });
+      } catch (error) {
+        alert('Failed to remove image. Is the server running?');
+      }
+    };
+
+    return (
+      <div>
+        <Nav />
+        {currentEvent?.gameRef ? (
+          <div style={{ position: 'fixed', top: '50px', left: 0, right: 0, bottom: 0, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            <img src={`${API}/${currentEvent.gameRef}`} alt="Game Reference" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+            <button onClick={handleRemove} className="delete-button" style={{ position: 'absolute', top: '20px', right: '20px', padding: '12px 20px', fontSize: '16px' }}>🗑 Remove Image</button>
+          </div>
+        ) : (
+          <div style={{ padding: '40px' }}>
+            <h2>Game Reference Image</h2>
+            <input type="file" accept="image/*" onChange={async (e) => {
+              if (!e.target.files[0]) return;
+              const formData = new FormData();
+              formData.append('image', e.target.files[0]);
+              const res = await axios.post(`${API}/upload/${currentEvent.id}`, formData);
+              setCurrentEvent({ ...currentEvent, gameRef: res.data.path });
+              e.target.value = '';
+            }} style={{ fontSize: '18px' }} />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ====================== CATEGORIES MODE ======================
   if (mode === 'categories') {
     return (
       <div>
@@ -196,8 +444,8 @@ export default function App() {
                   await axios.delete(`${API}/categories/${cat.id}`);
                   loadCategories(currentEvent.id);
                 }} className="delete-button">Delete</button>
-                {index > 0 && <button onClick={() => moveCategoryUp(index)} style={{width:'40px'}}>↑</button>}
-                {index < categories.length - 1 && <button onClick={() => moveCategoryDown(index)} style={{width:'40px'}}>↓</button>}
+                {index > 0 && <button onClick={() => moveCategoryUp(index)} style={{ width: '40px' }}>↑</button>}
+                {index < categories.length - 1 && <button onClick={() => moveCategoryDown(index)} style={{ width: '40px' }}>↓</button>}
               </div>
             ))}
           </div>
@@ -206,213 +454,95 @@ export default function App() {
     );
   }
 
-  // EDIT MODE (unchanged)
-  if (mode === 'edit') {
+  // EVENT SELECT
+  if (mode === 'select') {
     return (
-      <div>
-        <Nav />
-        <h2>Edit Announcements</h2>
-        {editingAnn && (
-          <div className='main'>
-            <div className="card" ref={contentRef} style={{ height: '100%', overflow: 'hidden' }}>
-              <h3>{editingAnn.id ? 'Edit Announcement' : 'New Announcement'}</h3>
-              <input placeholder="Title" value={editingAnn.title} onChange={e => setEditingAnn({...editingAnn, title: e.target.value})} style={{width:'100%', marginBottom:10}} />
-              <input placeholder="Subtitle" value={editingAnn.subtitle} onChange={e => setEditingAnn({...editingAnn, subtitle: e.target.value})} style={{width:'100%', marginBottom:10}} />
-              <textarea placeholder="Markdown Content" value={editingAnn.content} onChange={e => setEditingAnn({...editingAnn, content: e.target.value})} style={{width:'100%', height:150, marginBottom:10}} />
-              <select value={editingAnn.categoryId || ''} onChange={e => setEditingAnn({...editingAnn, categoryId: e.target.value || null})} style={{width:'100%', marginBottom:10}}>
-                <option value="">No Category</option>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-              <button onClick={async () => {
-                if (editingAnn.id) await axios.put(`${API}/announcements/${editingAnn.id}`, editingAnn);
-                else await axios.post(`${API}/announcements`, {...editingAnn, eventId: currentEvent.id});
-                setEditingAnn(null);
-                loadAnnouncements(currentEvent.id);
-              }}>Save</button>
-              <button className="secondary" onClick={() => setEditingAnn(null)} style={{marginLeft:10}}>Cancel</button>
+      <div className="event-select">
+        <h1 className="event-title">Select Event</h1>
+        <div className="event-list">
+          {events.map(e => (
+            <div key={e.id} className="event-item">
+              <button className="event-button" onClick={() => { setCurrentEvent(e); setMode('announce'); }}>
+                {e.title}
+              </button>
+              <button className="delete-button" onClick={async () => {
+                if (!window.confirm(`Delete "${e.title}"?`)) return;
+                await axios.delete(`${API}/events/${e.id}`);
+                setEvents(prev => prev.filter(ev => ev.id !== e.id));
+              }}>✕</button>
             </div>
-          </div>
-        )}
-        {!editingAnn && (
-          <div style={{ padding: '20px' }}>
-            <button onClick={() => setEditingAnn({id:null, title:'', subtitle:'', content:'', categoryId:null})}>New Announcement</button>
-            {announcements.map(a => (
-              <div key={a.id} style={{display:'flex', alignItems:'center', gap:'12px', margin:'12px 0', padding:'10px', background:'#2a2a2a', borderRadius:'8px'}}>
-                <strong style={{flex:1}}>{a.title}</strong>
-                {a.categoryId && <span style={{fontSize:'13px', color:'#888'}}>📂 {categories.find(c=>c.id===a.categoryId)?.name}</span>}
-                {a.highlight && <span style={{background:'#22c55e', color:'#000', padding:'2px 8px', borderRadius:'9999px', fontSize:'12px'}}>ANNOUNCED</span>}
-                <button onClick={() => setEditingAnn(a)}>Edit</button>
-                <button onClick={async () => { await axios.delete(`${API}/announcements/${a.id}`); loadAnnouncements(currentEvent.id); }}>Delete</button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
+          ))}
+            <button
+            className="event-button new"
+            onClick={async () => {
+              const title = prompt('New Event Name');
+              if (!title) return;
 
-  // ANNOUNCE MODE - With Minimize Feature
-  if (mode === 'announce') {
-    const groupedAnns = {};
-    categories.forEach(cat => groupedAnns[cat.id] = { name: cat.name, anns: [] });
-    const uncategorized = [];
+              const location = prompt('Event Location (optional)') || '';
+              const fieldName = prompt('Field Name (optional)') || '';
 
-    announcements.forEach(a => {
-      if (a.categoryId && groupedAnns[a.categoryId]) {
-        groupedAnns[a.categoryId].anns.push(a);
-      } else {
-        uncategorized.push(a);
-      }
-    });
+              // Ask if user wants to copy announcements from an existing event
+              let copyFromId = null;
+              if (events.length > 0) {
+                const eventOptions = events
+                  .map(e => `${e.id}: ${e.title}`)
+                  .join('\n');
 
-    return (
-      <div>
-        <Nav />
+                const choice = prompt(
+                  `Do you want to copy announcements from an existing event?\n\n` +
+                  `Enter the Event ID below, or leave blank to start fresh:\n\n` +
+                  eventOptions
+                );
 
-        <div className="container">
-          {/* SIDEBAR with Minimize Support */}
-          <div className="sidebar">
-            {currentEvent && (
-              <div className="home-card">
-                <h2>{currentEvent.title}</h2>
-                {currentEvent.location && <p>📍 {currentEvent.location}</p>}
-                {currentEvent.fieldName && <p>🏟 {currentEvent.fieldName}</p>}
-              </div>
-            )}
+                if (choice && choice.trim() !== '') {
+                  copyFromId = parseInt(choice.trim());
+                  if (isNaN(copyFromId)) copyFromId = null;
+                }
+              }
 
-            {/* Categorized Announcements */}
-            {categories.map(cat => {
-              const isMinimized = minimizedCategories.has(cat.id);
-              const catAnns = groupedAnns[cat.id]?.anns || [];
-              return (
-                <React.Fragment key={cat.id}>
-                  <div 
-                    className="category-label"
-                    onClick={() => toggleMinimize(cat.id)}
-                    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                  >
-                    <span>{cat.name}</span>
-                    <span style={{ fontSize: '18px', opacity: 0.8 }}>{isMinimized ? '▲' : '▼'}</span>
-                  </div>
-                  {!isMinimized && catAnns.map(a => (
-                    <button
-                      key={a.id}
-                      className={`ann-button ${a.highlight ? 'highlighted' : ''}`}
-                      onClick={() => setSelectedAnn(a)}
-                    >
-                      {a.title}
-                    </button>
-                  ))}
-                </React.Fragment>
-              );
-            })}
+              try {
+                let newEventId;
 
-            {/* Uncategorized */}
-            {uncategorized.length > 0 && (
-              <>
-                <div 
-                  className="category-label"
-                  onClick={() => toggleMinimize('uncat')}
-                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                >
-                  <span>Uncategorized</span>
-                  <span style={{ fontSize: '18px', opacity: 0.8 }}>{minimizedCategories.has('uncat') ? '▲' : '▼'}</span>
-                </div>
-                {!minimizedCategories.has('uncat') && uncategorized.map(a => (
-                  <button
-                    key={a.id}
-                    className={`ann-button ${a.highlight ? 'highlighted' : ''}`}
-                    onClick={() => setSelectedAnn(a)}
-                  >
-                    {a.title}
-                  </button>
-                ))}
-              </>
-            )}
+                if (copyFromId) {
+                  // Copy announcements + categories from existing event
+                  const res = await axios.post(`${API}/events/${copyFromId}/copy`);
+                  newEventId = res.data.id;
 
-            {announcements.length === 0 && <p style={{ padding: '10px', color: '#666' }}>No announcements yet</p>}
-          </div>
+                  // Update the new event's title, location, and fieldName
+                  await axios.put(`${API}/events/${newEventId}`, {
+                    title: title,
+                    location: location || null,
+                    fieldName: fieldName || null
+                  });
+                } else {
+                  // Create completely new event
+                  const res = await axios.post(`${API}/events`, {
+                    title,
+                    location: location || null,
+                    fieldName: fieldName || null
+                  });
+                  newEventId = res.data.id;
+                }
 
-          {/* MAIN CONTENT */}
-          <div className="main">
-            <div className="card" ref={contentRef}>
-              <div className="announce-content">
-                {!selectedAnn && <p>Select an announcement from the sidebar</p>}
+                // Refresh events list
+                const updated = await axios.get(`${API}/events`);
+                setEvents(updated.data);
 
-                {selectedAnn && (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                      <h1 className="title">{selectedAnn.title}</h1>
-                      <button
-                        onClick={() => toggleHighlight(selectedAnn)}
-                        style={{
-                          padding: '8px 16px',
-                          background: selectedAnn.highlight ? '#ef4444' : '#22c55e',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontWeight: '600'
-                        }}
-                      >
-                        {selectedAnn.highlight ? 'Announced' : 'Announce'}
-                      </button>
-                    </div>
-
-                    <h2 className="subtitle">{selectedAnn.subtitle}</h2>
-                    <div className="content">
-                      <ReactMarkdown>{selectedAnn.content}</ReactMarkdown>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
+                // Switch to the new event
+                const createdEvent = updated.data.find(e => e.id === newEventId);
+                if (createdEvent) {
+                  setCurrentEvent(createdEvent);
+                  setMode('announce');
+                }
+              } catch (error) {
+                console.error(error);
+                alert('Failed to create event. Please check the server.');
+              }
+            }}
+          >
+            + New Event
+          </button>
         </div>
-      </div>
-    );
-  }
-
-  // GAME REFERENCE (full screen - unchanged from previous)
-  if (mode === 'gameRef') {
-    const handleRemove = async () => {
-      if (!currentEvent?.gameRef) return;
-      if (!window.confirm('Remove the current game reference image?')) return;
-      try {
-        await axios.delete(`${API}/gameRef/${currentEvent.id}`);
-        setCurrentEvent({ ...currentEvent, gameRef: null });
-      } catch (error) {
-        alert('Failed to remove image. Is the server running?');
-      }
-    };
-
-    return (
-      <div>
-        <Nav />
-        {currentEvent?.gameRef ? (
-          <div style={{ position: 'fixed', top: '50px', left: 0, right: 0, bottom: 0, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-            <img 
-              src={`${API}/${currentEvent.gameRef}`} 
-              alt="Game Reference"
-              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
-            />
-            <button onClick={handleRemove} className="delete-button" style={{ position: 'absolute', top: '20px', right: '20px', padding: '12px 20px', fontSize: '16px' }}>
-              🗑 Remove Image
-            </button>
-          </div>
-        ) : (
-          <div style={{ padding: '40px' }}>
-            <h2>Game Reference Image</h2>
-            <input type="file" accept="image/*" onChange={async (e) => {
-              if (!e.target.files[0]) return;
-              const formData = new FormData();
-              formData.append('image', e.target.files[0]);
-              const res = await axios.post(`${API}/upload/${currentEvent.id}`, formData);
-              setCurrentEvent({ ...currentEvent, gameRef: res.data.path });
-              e.target.value = '';
-            }} style={{ fontSize: '18px' }} />
-          </div>
-        )}
       </div>
     );
   }

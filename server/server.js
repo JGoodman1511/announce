@@ -2,12 +2,11 @@ const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
 const multer = require('multer');
-const fs = require('fs'); 
+const fs = require('fs');
 const path = require('path');
 
 const app = express();
 const upload = multer({ dest: 'uploads/' });
-
 
 app.use(cors());
 app.use(express.json());
@@ -39,7 +38,8 @@ db.serialize(() => {
     subtitle TEXT,
     content TEXT,
     categoryId INTEGER,
-    highlight INTEGER DEFAULT 0
+    highlight INTEGER DEFAULT 0,
+    image TEXT   -- NEW: path to announcement image
   )`);
 });
 
@@ -61,39 +61,88 @@ app.post('/events', (req, res) => {
 
 // COPY EVENT (kept for completeness, now includes categories too)
 app.post('/events/:id/copy', (req, res) => {
-  const id = req.params.id;
+  const id = parseInt(req.params.id);
 
-  db.get('SELECT * FROM events WHERE id=?', [id], (err, event) => {
+  db.get('SELECT title FROM events WHERE id=?', [id], (err, originalEvent) => {
+    if (err || !originalEvent) return res.sendStatus(404);
+
+    // Create new event with blank location and fieldName
     db.run(
       `INSERT INTO events (title, location, fieldName, gameRef) VALUES (?, ?, ?, ?)`,
-      [event.title + ' Copy', event.location, event.fieldName, event.gameRef],
+      [originalEvent.title + ' Copy', null, null, null],
       function () {
         const newEventId = this.lastID;
 
-        // Copy announcements
-        db.all('SELECT * FROM announcements WHERE eventId=?', [id], (err, anns) => {
-          anns.forEach(a => {
+        // Copy categories
+        db.all('SELECT * FROM categories WHERE eventId=? ORDER BY sortOrder', [id], (err, cats) => {
+          const catMap = {}; // old category id → new category id
+
+          if (cats.length === 0) {
+            copyAnnouncements(newEventId, catMap);
+            return;
+          }
+
+          let completed = 0;
+          cats.forEach(cat => {
             db.run(
-              `INSERT INTO announcements (eventId, title, subtitle, content, categoryId, highlight)
-               VALUES (?, ?, ?, ?, ?, ?)`,
-              [newEventId, a.title, a.subtitle, a.content, a.categoryId, a.highlight]
+              `INSERT INTO categories (eventId, name, sortOrder) VALUES (?, ?, ?)`,
+              [newEventId, cat.name, cat.sortOrder],
+              function () {
+                catMap[cat.id] = this.lastID;
+                completed++;
+                if (completed === cats.length) {
+                  copyAnnouncements(newEventId, catMap);
+                }
+              }
             );
-          });
-          // Copy categories
-          db.all('SELECT * FROM categories WHERE eventId=? ORDER BY sortOrder', [id], (err, cats) => {
-            let order = 0;
-            cats.forEach(c => {
-              db.run(
-                `INSERT INTO categories (eventId, name, sortOrder) VALUES (?, ?, ?)`,
-                [newEventId, c.name, order++]
-              );
-            });
-            res.json({ id: newEventId });
           });
         });
       }
     );
   });
+
+  function copyAnnouncements(newEventId, catMap) {
+    db.all('SELECT * FROM announcements WHERE eventId=?', [id], (err, anns) => {
+      if (anns.length === 0) {
+        return res.json({ id: newEventId });
+      }
+
+      let completed = 0;
+      anns.forEach(ann => {
+        const newCategoryId = ann.categoryId ? catMap[ann.categoryId] || null : null;
+
+        db.run(
+          `INSERT INTO announcements (eventId, title, subtitle, content, categoryId, highlight, image)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [newEventId, ann.title, ann.subtitle, ann.content, newCategoryId, ann.highlight, ann.image],
+          () => {
+            completed++;
+            if (completed === anns.length) {
+              res.json({ id: newEventId });
+            }
+          }
+        );
+      });
+    });
+  }
+});
+
+// UPDATE EVENT (title, location, fieldName)
+app.put('/events/:id', (req, res) => {
+  const { title, location, fieldName } = req.body;
+  const id = req.params.id;
+
+  db.run(
+    `UPDATE events SET title = ?, location = ?, fieldName = ? WHERE id = ?`,
+    [title, location || null, fieldName || null, id],
+    function (err) {
+      if (err) {
+        console.error(err);
+        return res.sendStatus(500);
+      }
+      res.sendStatus(200);
+    }
+  );
 });
 
 // DELETE EVENTS
@@ -167,11 +216,11 @@ app.get('/announcements/:eventId', (req, res) => {
 });
 
 app.post('/announcements', (req, res) => {
-  const { eventId, title, subtitle, content, categoryId, highlight = 0 } = req.body;
+  const { eventId, title, subtitle, content, categoryId, highlight = 0, image } = req.body;
   db.run(
-    `INSERT INTO announcements (eventId, title, subtitle, content, categoryId, highlight)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [eventId, title, subtitle, content, categoryId, highlight ? 1 : 0],
+    `INSERT INTO announcements (eventId, title, subtitle, content, categoryId, highlight, image)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [eventId, title, subtitle, content, categoryId, highlight ? 1 : 0, image],
     function () {
       res.json({ id: this.lastID });
     }
@@ -179,19 +228,49 @@ app.post('/announcements', (req, res) => {
 });
 
 app.put('/announcements/:id', (req, res) => {
-  const { title, subtitle, content, categoryId, highlight } = req.body;
+  const { title, subtitle, content, categoryId, highlight, image } = req.body;
   db.run(
-    `UPDATE announcements SET title=?, subtitle=?, content=?, categoryId=?, highlight=? WHERE id=?`,
-    [title, subtitle, content, categoryId, highlight ? 1 : 0, req.params.id],
+    `UPDATE announcements SET title=?, subtitle=?, content=?, categoryId=?, highlight=?, image=? WHERE id=?`,
+    [title, subtitle, content, categoryId, highlight ? 1 : 0, image, req.params.id],
     () => res.sendStatus(200)
   );
 });
 
 app.delete('/announcements/:id', (req, res) => {
-  db.run(`DELETE FROM announcements WHERE id=?`, [req.params.id], () => res.sendStatus(200));
+  // Also delete associated image file if exists
+  db.get('SELECT image FROM announcements WHERE id=?', [req.params.id], (err, row) => {
+    if (row && row.image) {
+      const filePath = path.join(__dirname, row.image);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
+    db.run(`DELETE FROM announcements WHERE id=?`, [req.params.id], () => res.sendStatus(200));
+  });
 });
 
-// GAME REFERENCE IMAGE
+// Announcement image upload
+app.post('/upload/announcement/:annId', upload.single('image'), (req, res) => {
+  const imagePath = req.file.path;
+  db.run(`UPDATE announcements SET image = ? WHERE id = ?`, [imagePath, req.params.annId]);
+  res.json({ path: imagePath });
+});
+
+// Remove announcement image
+app.delete('/announcement/image/:annId', (req, res) => {
+  const annId = req.params.annId;
+  db.get('SELECT image FROM announcements WHERE id = ?', [annId], (err, row) => {
+    if (row && row.image) {
+      const filePath = path.join(__dirname, row.image);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+    db.run('UPDATE announcements SET image = NULL WHERE id = ?', [annId], () => {
+      res.sendStatus(200);
+    });
+  });
+});
+
+// Game Reference routes (keep your existing ones - the duplicate delete is cleaned up here)
 app.post('/upload/:eventId', upload.single('image'), (req, res) => {
   const path = req.file.path;
   db.run(`UPDATE events SET gameRef=? WHERE id=?`, [path, req.params.eventId]);
@@ -199,50 +278,15 @@ app.post('/upload/:eventId', upload.single('image'), (req, res) => {
 });
 
 app.delete('/gameRef/:eventId', (req, res) => {
-  const eventId = req.params.eventId;
-
-  db.get('SELECT gameRef FROM events WHERE id = ?', [eventId], (err, row) => {
-    if (row && row.gameRef) {
-      // Delete physical file if it exists
-      const filePath = path.join(__dirname, row.gameRef);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    }
-
-    db.run('UPDATE events SET gameRef = NULL WHERE id = ?', [eventId], (err) => {
-      if (err) return res.sendStatus(500);
-      res.sendStatus(200);
-    });
-  });
-});
-// REMOVE GAME REFERENCE IMAGE
-app.delete('/gameRef/:eventId', (req, res) => {
   const eventId = parseInt(req.params.eventId);
-
   db.get('SELECT gameRef FROM events WHERE id = ?', [eventId], (err, row) => {
-    if (err) return res.sendStatus(500);
-
     if (row && row.gameRef) {
-      // Delete the actual file from disk
       const filePath = path.join(__dirname, row.gameRef);
-      if (fs.existsSync(filePath)) {
-        try {
-          fs.unlinkSync(filePath);
-        } catch (e) {
-          console.error('Failed to delete file:', e);
-        }
-      }
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
-
-    // Clear the path in the database
-    db.run('UPDATE events SET gameRef = NULL WHERE id = ?', [eventId], (err) => {
-      if (err) return res.sendStatus(500);
-      res.sendStatus(200);
-    });
+    db.run('UPDATE events SET gameRef = NULL WHERE id = ?', [eventId], () => res.sendStatus(200));
   });
 });
-
 
 
 app.listen(4000, () => console.log('Server running on 4000'));

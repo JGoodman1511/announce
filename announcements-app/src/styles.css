@@ -23,6 +23,10 @@ body {
   cursor: pointer;
 }
 
+.announceButton {
+  background: #3b82f6;
+}
+
 .navbar button:hover {
   background: #3a3a3a;
 }
@@ -60,7 +64,7 @@ body {
 
 /* New: Highlighted (green) buttons */
 .sidebar button.highlighted {
-  background: #22c55e !important;
+  background: #7175b8 !important;
   color: #000 !important;
   font-weight: 600;
 }
@@ -377,4 +381,28 @@ h1, h2, h3 {
 /* Remove or weaken the overly aggressive inherit rule */
 .content * {
   font-size: inherit;   /* removed !important so bold can override weight */
+}
+
+/* Make announcement photos as large as possible */
+.announce-content img {
+  width: 100% !important;
+  max-height: 85vh !important;
+  object-fit: contain !important;
+  margin: 0 0 0 0 !important;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+}
+
+/* Active announcement button */
+.sidebar button.ann-button.active {
+  background: #3b82f6 !important;     /* Bright blue */
+  color: white !important;
+  border: 2px solid #60a5fa;
+  font-weight: 600;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+/* Make sure active takes priority over highlighted */
+.sidebar button.ann-button.active.highlighted {
+  background: #2563eb !important;     /* Slightly darker blue when both active + highlighted */
 }
