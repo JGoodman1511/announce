@@ -1,4 +1,3 @@
-/* ===== GLOBAL ===== */
 body {
   margin: 0;
   font-family: 'Segoe UI', Roboto, sans-serif;
@@ -59,6 +58,27 @@ body {
   background: #3a3a3a;
 }
 
+/* New: Highlighted (green) buttons */
+.sidebar button.highlighted {
+  background: #22c55e !important;
+  color: #000 !important;
+  font-weight: 600;
+}
+
+/* New: Category labels / dividers */
+.category-label {
+  padding: 8px 12px;
+  background: #333;
+  color: #aaa;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 18px 0 8px 0;
+  border-radius: 6px;
+  border-left: 4px solid #22c55e;
+}
+
 /* ===== MAIN CONTENT ===== */
 .main {
   flex: 1;
@@ -72,8 +92,8 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  justify-content: center;   /* vertical center */
-  align-items: center;       /* horizontal center */
+  justify-content: center;
+  align-items: center;
   text-align: center;
 }
 
@@ -308,4 +328,53 @@ h1, h2, h3 {
 /* VERY IMPORTANT — force markdown to inherit */
 .content * {
   font-size: inherit !important;
+}
+
+/* ===== CATEGORY EDIT ITEM (optional extra polish) ===== */
+.category-item {
+  transition: background 0.2s;
+}
+
+.category-item:hover {
+  background: #3a3a3a;
+}
+
+/* ===== MARKDOWN TYPOGRAPHY FIX ===== */
+
+/* Bold support */
+.announce-content strong,
+.announce-content b,
+.content strong,
+.content b {
+  font-weight: 700 !important;     /* or 800 / 900 for even bolder */
+}
+
+/* Italic support (you already had some, but make sure) */
+.announce-content em,
+.announce-content i,
+.content em,
+.content i {
+  font-style: italic !important;
+}
+
+/* Optional: Bold + Italic together */
+.announce-content strong em,
+.announce-content em strong,
+.content strong em,
+.content em strong {
+  font-weight: 700 !important;
+  font-style: italic !important;
+}
+
+/* Make sure headings inside content don't fight bold */
+.announce-content h1,
+.announce-content h2,
+.announce-content h3,
+.announce-content h4 {
+  font-weight: 600;   /* or keep your existing if you prefer */
+}
+
+/* Remove or weaken the overly aggressive inherit rule */
+.content * {
+  font-size: inherit;   /* removed !important so bold can override weight */
 }
