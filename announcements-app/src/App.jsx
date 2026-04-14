@@ -70,9 +70,9 @@ export default function App() {
   useEffect(() => {
     if (!contentRef.current) return;
     const el = contentRef.current;
-    const BASE_CONTENT = 80;
+    const BASE_CONTENT = 40;
     el.style.setProperty('--content-size', `${BASE_CONTENT}px`);
-    el.style.setProperty('--subtitle-size', `${BASE_CONTENT * 1.2}px`);
+    el.style.setProperty('--subtitle-size', `${BASE_CONTENT * 1.1}px`);
     el.style.setProperty('--title-size', `${BASE_CONTENT * 1.5}px`);
     void el.offsetHeight;
     requestAnimationFrame(() => requestAnimationFrame(() => fitText(el)));
@@ -118,7 +118,7 @@ export default function App() {
   const Nav = () => (
     <div className='navbar'>
       <button onClick={() => setMode('select')}>Event Select</button>
-      <button className='announceButton'onClick={() => setMode('announce')}>Announce</button>
+      <button onClick={() => setMode('announce')}>Announce</button>
       <button onClick={() => setMode('edit')}>Edit Cards</button>
       <button onClick={() => setMode('categories')}>Edit Categories</button>
       <button onClick={() => setMode('gameRef')}>Game Reference</button>
@@ -130,7 +130,7 @@ export default function App() {
     return (
       <div>
         <Nav />
-        <h2>Edit Announcements</h2>
+        <h2 className='editannouncements'>Edit Announcements</h2>
 
         {editingAnn && (
           <div className='main'>
@@ -318,14 +318,16 @@ export default function App() {
 
                 {selectedAnn && (
                   <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                       <h1 className="title">{selectedAnn.title}</h1>
                       <button 
                         onClick={() => toggleHighlight(selectedAnn)} 
                         style={{
+                          justifyContent: 'right',
                           padding: '8px 16px',
+                          marginLeft: '500px',
                           background: selectedAnn.highlight ? '#ef4444' : '#22c55e',
-                          color: '#fff',
+                          color: '#fff', 
                           border: 'none',
                           borderRadius: '6px',
                           cursor: 'pointer',
@@ -373,7 +375,7 @@ export default function App() {
       </div>
     );
   }
-
+ 
   // ====================== GAME REFERENCE ======================
   if (mode === 'gameRef') {
     const handleRemove = async () => {

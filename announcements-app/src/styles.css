@@ -1,6 +1,9 @@
+* {
+  font-family: 'Roboto', 'Segoe UI', sans-serif;
+}
+
 body {
   margin: 0;
-  font-family: 'Segoe UI', Roboto, sans-serif;
   background-color: #141313;
   color: #e0e0e0;
 }
@@ -18,13 +21,14 @@ body {
   background: #2a2a2a;
   color: #fff;
   border: none;
-  padding: 8px 14px;
+  padding: 8px 25px;
   border-radius: 6px;
   cursor: pointer;
+  font-weight: 510;
 }
 
-.announceButton {
-  background: #3b82f6;
+.navbar .announceButton {
+  background: #4495ff7a;
 }
 
 .navbar button:hover {
@@ -62,7 +66,7 @@ body {
   background: #3a3a3a;
 }
 
-/* New: Highlighted (green) buttons */
+/* Highlighted buttons */
 .sidebar button.highlighted {
   background: #7175b8 !important;
   color: #000 !important;
@@ -145,7 +149,7 @@ body {
   padding: 30px;
   border-radius: 12px;
   box-shadow: 0 0 25px rgba(0,0,0,0.8);
-  height: 100%;
+  height: 90%;
   display: flex;
   flex-direction: column;
 
@@ -201,16 +205,16 @@ h1, h2, h3 {
 /* ===== ULTRA LARGE DISPLAY TYPOGRAPHY ===== */
 
 :root {
-  --title-size: clamp(40px, 5vw, 120px);
-  --subtitle-size: clamp(24px, 3vw, 64px);
-  --content-size: clamp(28px, 3vw, 70px);
+  --title-size: clamp(30px, 2vw, 40px);
+  --subtitle-size: clamp(24px, 1.5vw, 30px);
+  --content-size: clamp(24px, 1vw, 30px);
 }
 
 /* Title */
 .card h1 {
   font-size: var(--title-size);
   font-weight: 400;
-  margin: 0 0 20px 0;
+  margin: 0 0 0 0;
   line-height: 1.1;
 }
 
@@ -218,7 +222,7 @@ h1, h2, h3 {
 .card h2,
 .card h3 {
   font-size: var(--subtitle-size);
-  font-weight: 500;
+  font-weight: 100;
   font-style: italic;
   margin: 0 0 0 0;
   opacity: 0.9;
@@ -405,4 +409,33 @@ h1, h2, h3 {
 /* Make sure active takes priority over highlighted */
 .sidebar button.ann-button.active.highlighted {
   background: #2563eb !important;     /* Slightly darker blue when both active + highlighted */
+}
+
+/* ===== SCROLLBAR (Chrome, Edge, Safari) ===== */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #444 transparent;
+}
+
+.editannouncements {
+  margin: 20px;
 }
