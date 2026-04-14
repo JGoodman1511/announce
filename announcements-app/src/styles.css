@@ -63,7 +63,7 @@ body {
 .main {
   flex: 1;
   padding: 10px;
-  height: 100vh;
+  height: calc(100vh - 50px);
 }
 
 /* ===== EVENT SELECT SCREEN ===== */
@@ -121,7 +121,7 @@ body {
   padding: 30px;
   border-radius: 12px;
   box-shadow: 0 0 25px rgba(0,0,0,0.8);
-  height: 100vh;
+  height: 100%;
   display: flex;
   flex-direction: column;
 
@@ -253,4 +253,59 @@ h1, h2, h3 {
 
 .delete-button:hover {
   background: #dc2626;
+}
+
+/* Apply content font size to ALL markdown text */
+.announce-content {
+  font-size: var(--content-size);
+}
+
+/* Ensure all children inherit properly */
+.announce-content p,
+.announce-content li,
+.announce-content span,
+.announce-content div {
+  font-size: inherit;
+}
+
+/* Fix headings if markdown uses them */
+.announce-content h1,
+.announce-content h2,
+.announce-content h3,
+.announce-content h4 {
+  font-size: var(--subtitle-size);
+}
+
+/* Lists spacing */
+.announce-content ul,
+.announce-content ol {
+  padding-left: 1.2em;
+}
+
+.content {
+  font-size: var(--content-size);
+  line-height: 1.2;
+}
+
+/* TITLE */
+.title {
+  font-size: var(--title-size);
+  margin-bottom: 10px;
+}
+
+/* SUBTITLE */
+.subtitle {
+  font-size: var(--subtitle-size);
+  margin-bottom: 20px;
+}
+
+/* CONTENT ROOT */
+.content {
+  font-size: var(--content-size);
+  line-height: 1.2;
+}
+
+/* VERY IMPORTANT — force markdown to inherit */
+.content * {
+  font-size: inherit !important;
 }

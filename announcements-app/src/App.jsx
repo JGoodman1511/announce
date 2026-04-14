@@ -22,6 +22,42 @@ export default function App() {
     content: 40
   });
 
+  const fitText = (el) => {
+    if (!el) return;
+
+    const content = el.querySelector('.announce-content');
+    if (!content) return;
+
+    let contentSize = 80;
+
+    // Ratios (tweak these freely)
+    const TITLE_RATIO = 1.5;
+    const SUBTITLE_RATIO = 1.2;
+
+    const fits = () => {
+      const containerRect = el.getBoundingClientRect();
+      const contentRect = content.getBoundingClientRect();
+
+      return (
+        contentRect.height <= containerRect.height &&
+        contentRect.width <= containerRect.width
+      );
+    };
+
+    let attempts = 0;
+
+    while (!fits() && attempts < 100) {
+      contentSize *= 0.85;
+
+    el.style.setProperty('--content-size', `${contentSize}px`);
+    el.style.setProperty('--subtitle-size', `${contentSize * SUBTITLE_RATIO}px`);
+    el.style.setProperty('--title-size', `${contentSize * TITLE_RATIO}px`);
+
+      attempts++;
+    }
+  };
+
+
   useEffect(() => {
   if (announcements.length > 0 && !selectedAnn) {
     setSelectedAnn(announcements[0]);
@@ -36,52 +72,70 @@ export default function App() {
     axios.get(`${API}/announcements/${eventId}`).then(res => setAnnouncements(res.data));
   };
 
-  useEffect(() => {
+useEffect(() => {
   if (!contentRef.current) return;
 
   const el = contentRef.current;
 
-  let titleSize = 120;
-  let subtitleSize = 60;
-  let contentSize = 40;
+  // HARD RESET (force layout refresh)
+  const BASE_CONTENT = 80;
 
-  const fitText = () => {
-    let attempts = 0;
+  el.style.setProperty('--content-size', `${BASE_CONTENT}px`);
+  el.style.setProperty('--subtitle-size', `${BASE_CONTENT * 1.2}px`);
+  el.style.setProperty('--title-size', `${BASE_CONTENT * 1.5}px`);
 
-    const isOverflowing = () => {
-      // Force browser reflow BEFORE measuring
-      el.getBoundingClientRect();
+  // Force browser to APPLY the reset before measuring
+  void el.offsetHeight;
 
-      return el.scrollHeight > el.clientHeight;
-    };
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      fitText(el);
+    });
+  });
 
-    while (isOverflowing() && attempts < 100) {
-      titleSize *= 0.85;
-      subtitleSize *= 0.85;
-      contentSize *= 0.85;
+}, [selectedAnn?.id]);
 
-      el.style.setProperty('--title-size', `${titleSize}px`);
-      el.style.setProperty('--subtitle-size', `${subtitleSize}px`);
-      el.style.setProperty('--content-size', `${contentSize}px`);
+useEffect(() => {
+  const handleResize = () => {
+    if (!contentRef.current) return;
 
-      attempts++;
-    }
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        // reset sizes before re-fitting
+        const el = contentRef.current;
+        el.style.setProperty('--title-size', `120px`);
+        el.style.setProperty('--subtitle-size', `60px`);
+        el.style.setProperty('--content-size', `40px`);
 
-    setFontSize({
-      title: titleSize,
-      subtitle: subtitleSize,
-      content: contentSize
+        // rerun fit
+        const event = new Event('fit');
+        window.dispatchEvent(event);
+      });
     });
   };
 
-  // Reset before fitting
-  el.style.setProperty('--title-size', `120px`);
-  el.style.setProperty('--subtitle-size', `60px`);
-  el.style.setProperty('--content-size', `40px`);
+  window.addEventListener('resize', handleResize);
 
-  setTimeout(fitText, 50);
+  return () => window.removeEventListener('resize', handleResize);
+}, []);
 
-}, [selectedAnn]);
+useEffect(() => {
+  if (!contentRef.current) return;
+
+  const el = contentRef.current;
+
+  const observer = new ResizeObserver(() => {
+    requestAnimationFrame(() => {
+      fitText(el);
+    });
+  });
+
+  observer.observe(el);
+
+  return () => observer.disconnect();
+}, []);
+
+
 
   // EVENT SELECT PAGE
   if (mode === 'select') {
@@ -331,27 +385,31 @@ if (mode === 'announce') {
 
         {/* MAIN CONTENT */}
         <div className="main">
-          <div className="card">
-            {!selectedAnn && <p>Select an announcement</p>}
+          <div className="card" ref={contentRef}>
+            <div className="announce-content">
 
-            {selectedAnn && (
-              <div>
-                <h1 style={{ fontSize: 'var(--title-size)', marginBottom: 10 }}>
-                  {selectedAnn.title}
-                </h1>
+              {!selectedAnn && <p>Select an announcement</p>}
 
-                <h2 style={{ fontSize: 'var(--subtitle-size)', marginBottom: 20 }}>
-                  {selectedAnn.subtitle}
-                </h2>
+              {selectedAnn && (
+                <>
+                  <h1 className="title">
+                    {selectedAnn.title}
+                  </h1>
 
-                <div style={{ fontSize: 'var(--content-size)' }}>
-                  <ReactMarkdown>{selectedAnn.content}</ReactMarkdown>
-                </div>
-              </div>
-            )}
+                  <h2 className="subtitle">
+                    {selectedAnn.subtitle}
+                  </h2>
+
+                  <div className="content">
+                    <ReactMarkdown>
+                      {selectedAnn.content}
+                    </ReactMarkdown>
+                  </div>
+                </>
+              )}
           </div>
         </div>
-
+      </div>
       </div>
     </div>
   );
