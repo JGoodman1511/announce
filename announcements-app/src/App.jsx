@@ -70,7 +70,7 @@ export default function App() {
   useEffect(() => {
     if (!contentRef.current) return;
     const el = contentRef.current;
-    const BASE_CONTENT = 40;
+    const BASE_CONTENT = 55;
     el.style.setProperty('--content-size', `${BASE_CONTENT}px`);
     el.style.setProperty('--subtitle-size', `${BASE_CONTENT * 1.1}px`);
     el.style.setProperty('--title-size', `${BASE_CONTENT * 1.5}px`);
@@ -343,7 +343,7 @@ export default function App() {
                     {selectedAnn.image && (
                       <div style={{ 
                         flex: '1 1 auto',
-                        margin: '20px 0 35px 0',
+                        margin: '35px 0 20px 0',
                         display: 'flex',
                         justifyContent: 'center',
                         alignItems: 'center',
@@ -395,7 +395,7 @@ export default function App() {
         {currentEvent?.gameRef ? (
           <div style={{ position: 'fixed', top: '50px', left: 0, right: 0, bottom: 0, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             <img src={`${API}/${currentEvent.gameRef}`} alt="Game Reference" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-            <button onClick={handleRemove} className="delete-button" style={{ position: 'absolute', top: '20px', right: '20px', padding: '12px 20px', fontSize: '16px' }}>🗑 Remove Image</button>
+            <button onClick={handleRemove} className="delete-button" style={{ position: 'absolute', top: '20px', right: '20px', padding: '12px 12px', fontSize: '16px' }}>X</button>
           </div>
         ) : (
           <div style={{ padding: '40px' }}>
